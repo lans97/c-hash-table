@@ -15,14 +15,16 @@ typedef struct {
     size_t elements;
 } table;
 
-int table_init(table* self);
+int table_init(table* self, size_t capacity);
 void table_deinit(table* self);
 
-table* table_new();
+table* table_new(size_t capacity);
 void table_delete(table* self);
 
 int table_insert(const char* key, const char* value);
 int table_get(const char* key);
 int table_remove(const char* key);
+
+size_t table_hash_f(const char* str, size_t length);
 
 #endif
