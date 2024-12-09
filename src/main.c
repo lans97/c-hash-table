@@ -3,17 +3,23 @@
 #include <hash-table.h>
 
 int main(int argc, char* argv[]) {
-    sds s1 = sdsnew("Hello, world!");
-    sds s2 = sdsnew("Test string");
-    printf("s1: %s\n", s1);
-    size_t s1_hash = table_hash_f(s1, sdslen(s1));
-    printf("s1_hash: %zu\n", s1_hash);
+    table t1;
+    table_init(&t1, 7);
 
-    printf("s2: %s\n", s2);
-    size_t s2_hash = table_hash_f(s2, sdslen(s2));
-    printf("s1_hash: %zu\n", s1_hash);
+    table_insert(&t1, "test", "123");
+    printf("Table load: %f\n", table_load_index(&t1));
+    table_insert(&t1, "key1", "321");
+    printf("Table load: %f\n", table_load_index(&t1));
+    table_insert(&t1, "somethign", "blabla");
+    printf("Table load: %f\n", table_load_index(&t1));
 
-    sdsfree(s1);
-    sdsfree(s2);
+    table_remove(&t1, "test");
+    printf("Table load: %f\n", table_load_index(&t1));
+
+    printf("Lookup key '%s': %s\n", "test", table_get(&t1, "test"));
+    printf("Lookup key '%s': %s\n", "key1", table_get(&t1, "key1"));
+    printf("Lookup key '%s': %s\n", "somethign", table_get(&t1, "somethign"));
+
+    table_deinit(&t1);
     return 0;
 }

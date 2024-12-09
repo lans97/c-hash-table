@@ -21,10 +21,12 @@ void table_deinit(table* self);
 table* table_new(size_t capacity);
 void table_delete(table* self);
 
-int table_insert(const char* key, const char* value);
-int table_get(const char* key);
-int table_remove(const char* key);
+int table_insert(table* self, const char* key, const char* value);
+sds table_get(table* self, const char* key);
+int table_remove(table* self, const char* key);
 
-size_t table_hash_f(const char* str, size_t length);
+float table_load_index(table *self);
+
+size_t table_hash_f(const char* str);
 
 #endif

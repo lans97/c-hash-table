@@ -1,23 +1,44 @@
-#include "sds.h"
 #include <hash-table.h>
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <logger.h>
+#include <sds.h>
+#include <errno.h>
+#include <string.h>
 
-#define FNV32_PRIME 16777619;
-#define FNV32_OFFSET_BASIS 2166136261;
+#define MAX_KEY_LENGTH 1024
 
-#define FNV64_PRIME 1099511628211;
-#define FNV64_OFFSET_BASIS 14695981039346656037;
+// Chose 64 bits if available, else use 32...
+// Yes, I'm ignoring other architectures
+#ifdef INT64_MAX
+    #define FNV_PRIME 1099511628211
+    #define FNV_OFFSET_BASIS 14695981039346656037
+#else
+    #define FNV_PRIME 16777619
+    #define FNV_OFFSET_BASIS 2166136261
+#endif
+
+
 
 int table_init(table* self, size_t capacity) {
     self->capacity = capacity;
     self->elements = 0;
     self->arr = (pair*) calloc(self->capacity, sizeof(pair));
+    if (self->arr == NULL) {
+        LOG_ERROR("Could not allocate memmory for hash table: %s", strerror(errno));
+        return -1;
+    }
     return 0;
 }
 
 void table_deinit(table* self) {
+    for (int i = 0; i < self->capacity; i++) {
+        if (self->arr[i].key != NULL) {
+            sdsfree(self->arr[i].key);
+            sdsfree(self->arr[i].value);
+        }
+    }
     free(self->arr);
     self->arr = NULL;
     self->capacity = 0;
@@ -26,7 +47,8 @@ void table_deinit(table* self) {
 
 table* table_new(size_t capacity) {
     table* new_table = (table*) malloc(sizeof(table));
-    table_init(new_table, capacity);
+    if (table_init(new_table, capacity) == -1)
+        return NULL;
 
     return new_table;
 }
@@ -36,36 +58,59 @@ void table_delete(table* self) {
     free(self);
 }
 
-int table_insert(const char* key, const char* value) {
-    return 0;
-}
+int table_insert(table* self, const char* key, const char* value) {
+    size_t position = table_hash_f(key) % self->capacity;
 
-int table_get(const char* key) {
-    return 0;
-}
-
-int table_remove(const char* key) {
-    return 0;
-}
-
-size_t table_hash_f(const char* str, size_t length) {
-    if (length <= 0) {
-        LOG_ERROR("Length must be greater than 0");
-        return 0;
+    if (self->arr[position].key != NULL) {
+        LOG_WARNING("Colition: <%s, %s>", self->arr[position].key, self->arr[position].value);
+        return -1;
     }
-    char prehash[4];
-    bool lgt1 = (length > 1);
 
-    prehash[0] = str[0];
-    prehash[1] = str[1] * lgt1;
-    prehash[2] = str[length - 2] * lgt1;
-    prehash[3] = str[length - 1] * lgt1;
+    self->arr[position].key = sdsnew(key);
+    self->arr[position].value = sdsnew(value);
 
-    // FNV-1a implementation (32 bits)
-    size_t hash = FNV32_OFFSET_BASIS;
-    for (int i = 0; i < 4; i++) {
-        hash = hash ^ prehash[i];
-        hash = hash * FNV32_PRIME;
+    self->elements++;
+    return 0;
+}
+
+sds table_get(table* self, const char* key) {
+    size_t position = table_hash_f(key) % self->capacity;
+
+    if (self->arr[position].key == NULL || strcmp(self->arr[position].key, key) != 0) {
+        LOG_INFO("No entry with key '%s'", key);
+        return NULL;
+    }
+
+    return self->arr[position].value;
+}
+
+int table_remove(table* self, const char* key) {
+    size_t position = table_hash_f(key) % self->capacity;
+
+    if (self->arr[position].key == NULL || strcmp(self->arr[position].key, key) != 0) {
+        LOG_INFO("No entry with key '%s'", key);
+        return -1;
+    }
+
+    sdsfree(self->arr[position].key);
+    sdsfree(self->arr[position].value);
+    self->arr[position].key = NULL;
+    self->arr[position].value = NULL;
+
+    self->elements--;
+    return 0;
+}
+
+float table_load_index(table *self) {
+    return (float)self->elements/(float)self->capacity;
+}
+
+size_t table_hash_f(const char* str) {
+    // FNV-1a implementation
+    size_t hash = FNV_OFFSET_BASIS;
+    for (int i = 0; str[i] != 0 && i < MAX_KEY_LENGTH; i++) {
+        hash = hash ^ str[i];
+        hash = hash * FNV_PRIME;
     }
 
     return hash;
