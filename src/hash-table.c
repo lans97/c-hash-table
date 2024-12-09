@@ -62,7 +62,7 @@ int table_insert(table* self, const char* key, const char* value) {
     size_t position = table_hash_f(key) % self->capacity;
 
     if (self->arr[position].key != NULL) {
-        LOG_WARNING("Colition: <%s, %s>", self->arr[position].key, self->arr[position].value);
+        LOG_WARNING("Colision: <%s, %s>", self->arr[position].key, self->arr[position].value);
         return -1;
     }
 
