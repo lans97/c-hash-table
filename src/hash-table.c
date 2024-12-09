@@ -1,32 +1,33 @@
 #include <hash-table.h>
 
+#include <errno.h>
+#include <logger.h>
+#include <math.h>
+#include <sds.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <logger.h>
-#include <sds.h>
-#include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_KEY_LENGTH 1024
 
 // Chose 64 bits if available, else use 32...
 // Yes, I'm ignoring other architectures
 #ifdef INT64_MAX
-    #define FNV_PRIME 1099511628211
-    #define FNV_OFFSET_BASIS 14695981039346656037
+#define FNV_PRIME 1099511628211
+#define FNV_OFFSET_BASIS 14695981039346656037
 #else
-    #define FNV_PRIME 16777619
-    #define FNV_OFFSET_BASIS 2166136261
+#define FNV_PRIME 16777619
+#define FNV_OFFSET_BASIS 2166136261
 #endif
-
-
 
 int table_init(table* self, size_t capacity) {
     self->capacity = capacity;
     self->elements = 0;
-    self->arr = (pair*) calloc(self->capacity, sizeof(pair));
+    self->arr = calloc(self->capacity, sizeof(pair));
     if (self->arr == NULL) {
-        LOG_ERROR("Could not allocate memmory for hash table: %s", strerror(errno));
+        LOG_ERROR("Could not allocate memmory for hash table: %s",
+                  strerror(errno));
         return -1;
     }
     return 0;
@@ -46,7 +47,7 @@ void table_deinit(table* self) {
 }
 
 table* table_new(size_t capacity) {
-    table* new_table = (table*) malloc(sizeof(table));
+    table* new_table = malloc(sizeof(table));
     if (table_init(new_table, capacity) == -1)
         return NULL;
 
@@ -60,9 +61,13 @@ void table_delete(table* self) {
 
 int table_insert(table* self, const char* key, const char* value) {
     size_t position = table_hash_f(key) % self->capacity;
+    if (((float)self->elements + 1)/(self->capacity) > 0.85) {
+        table_grow(self);
+    }
 
     if (self->arr[position].key != NULL) {
-        LOG_WARNING("Colision: <%s, %s>", self->arr[position].key, self->arr[position].value);
+        LOG_WARNING("Colision: <%s, %s>", self->arr[position].key,
+                    self->arr[position].value);
         return -1;
     }
 
@@ -76,7 +81,8 @@ int table_insert(table* self, const char* key, const char* value) {
 sds table_get(table* self, const char* key) {
     size_t position = table_hash_f(key) % self->capacity;
 
-    if (self->arr[position].key == NULL || strcmp(self->arr[position].key, key) != 0) {
+    if (self->arr[position].key == NULL ||
+        strcmp(self->arr[position].key, key) != 0) {
         LOG_INFO("No entry with key '%s'", key);
         return NULL;
     }
@@ -87,7 +93,8 @@ sds table_get(table* self, const char* key) {
 int table_remove(table* self, const char* key) {
     size_t position = table_hash_f(key) % self->capacity;
 
-    if (self->arr[position].key == NULL || strcmp(self->arr[position].key, key) != 0) {
+    if (self->arr[position].key == NULL ||
+        strcmp(self->arr[position].key, key) != 0) {
         LOG_INFO("No entry with key '%s'", key);
         return -1;
     }
@@ -101,8 +108,35 @@ int table_remove(table* self, const char* key) {
     return 0;
 }
 
-float table_load_index(table *self) {
-    return (float)self->elements/(float)self->capacity;
+int table_grow(table* self) {
+    LOG_DEBUG("Table is growing");
+    size_t new_capacity = self->capacity * 2;
+    while (!primality_division(new_capacity, new_capacity)) {
+        new_capacity++;
+    }
+
+    pair* new_arr = calloc(new_capacity, sizeof(pair));
+    size_t new_position;
+
+    for (int i = 0; i < self->capacity; i++) {
+        if (self->arr[i].key != NULL) {
+            new_position = table_hash_f(self->arr[i].key) % new_capacity;
+
+            if (new_arr[new_position].key != NULL) {
+                LOG_WARNING("Colision: <%s, %s>", new_arr[new_position].key,
+                            new_arr[new_position].value);
+                continue;
+            }
+            new_arr[new_position].key = self->arr[i].key;
+            new_arr[new_position].value = self->arr[i].value;
+        }
+    }
+
+    free(self->arr);
+    self->arr = new_arr;
+    self->capacity = new_capacity;
+
+    return 0;
 }
 
 size_t table_hash_f(const char* str) {
@@ -114,4 +148,12 @@ size_t table_hash_f(const char* str) {
     }
 
     return hash;
+}
+
+bool primality_division(unsigned int n, unsigned int limit) {
+    for (int i = 2; i < limit; i++) {
+        if (n % i == 0)
+            return false;
+    }
+    return true;
 }

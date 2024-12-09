@@ -16,6 +16,7 @@ target_link_libraries(
     main PRIVATE
     sds
     logger
+    m
 )
 
 target_compile_features(

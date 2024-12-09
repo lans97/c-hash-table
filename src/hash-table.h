@@ -25,8 +25,10 @@ int table_insert(table* self, const char* key, const char* value);
 sds table_get(table* self, const char* key);
 int table_remove(table* self, const char* key);
 
-float table_load_index(table *self);
+int table_grow(table* self);
 
 size_t table_hash_f(const char* str);
+
+bool primality_division(unsigned int n, unsigned int limit);
 
 #endif
