@@ -10,18 +10,13 @@ int main(int argc, char* argv[]) {
     table_insert(&t1, "test", "123");
     table_insert(&t1, "key1", "321");
     table_insert(&t1, "somethign", "blabla");
+    table_insert(&t1, "fdjskal", "fdjsabvb");
+    table_insert(&t1, "dfjsah", "fdsjav");
 
-    printf("Hash table:\n");
-    for (int i = 0; i < t1.capacity; i++) {
-        printf("%d: <%s,%s>\n", i, t1.arr[i].key, t1.arr[i].value);
-    }
+    table_print(&t1);
 
-    table_grow(&t1);
-
-    printf("Hash table:\n");
-    for (int i = 0; i < t1.capacity; i++) {
-        printf("%d: <%s,%s>\n", i, t1.arr[i].key, t1.arr[i].value);
-    }
+    printf("%s: %s\n", "fdjskal", table_get(&t1, "fdjskal"));
+    printf("%s: %s\n", "somethign", table_get(&t1, "somethign"));
 
     table_deinit(&t1);
     return 0;
